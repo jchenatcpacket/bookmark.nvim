@@ -158,12 +158,33 @@ local function build(width)
     end
   end
 
-  -- Footer.
+  -- Footer. Pack the hint segments onto as many lines as needed so they wrap
+  -- within the popup width instead of overflowing (the window has wrap off).
   table.insert(lines, sep)
   table.insert(hls, { line = #lines - 1, col_start = 0, col_end = #sep, hl = "BookmarksUISep" })
-  local hint = "  <CR> jump   d delete   D clear tab   <Tab> next   0/1/2/3 filter   q close"
-  table.insert(lines, hint)
-  table.insert(hls, { line = #lines - 1, col_start = 0, col_end = #hint, hl = "BookmarksUIHint" })
+
+  local segs = {
+    "<CR> jump", "d delete", "D clear tab", "<Tab> next", "0/1/2/3 filter", "q close",
+  }
+  local indent, gap = "  ", "   "
+  local avail = math.max(1, width)
+  local function emit_hint(text)
+    table.insert(lines, text)
+    table.insert(hls, { line = #lines - 1, col_start = 0, col_end = #text, hl = "BookmarksUIHint" })
+  end
+  local cur = indent
+  for _, seg in ipairs(segs) do
+    local candidate = (cur == indent) and (cur .. seg) or (cur .. gap .. seg)
+    if #candidate > avail and cur ~= indent then
+      emit_hint(cur)
+      cur = indent .. seg
+    else
+      cur = candidate
+    end
+  end
+  if cur ~= indent then
+    emit_hint(cur)
+  end
 
   return lines, hls, map, entry_lines
 end
@@ -421,16 +442,23 @@ function M.open(filter)
   height = math.min(height, total_h - 4)
   local row = math.floor((total_h - height) / 2 - 1)
 
+  -- Overall popup width from config (list pane + optional preview pane,
+  -- including the 2-column border between them).
+  local width = dimension(ui.width or 0.6, total_w, 40)
+  width = math.min(width, total_w - 2)
+
   -- Decide whether to show the preview pane beside the list.
   local preview_cfg = config.options.preview or {}
   local show_preview = preview_cfg.enable ~= false
 
   local list_w, preview_w, list_col, preview_col
   if show_preview then
-    list_w = math.max(40, math.floor(total_w * 0.38))
-    preview_w = total_w - list_w - 6 -- 2 outer margins + 2 gap + 2 shared border cols
+    -- Split the overall width between the list and the preview, reserving 2
+    -- columns for the shared border between the two panes.
+    list_w = math.max(30, math.floor((width - 2) * 0.4))
+    preview_w = width - 2 - list_w
     if preview_w < 30 then
-      show_preview = false -- not enough horizontal room
+      show_preview = false -- not enough horizontal room for a useful preview
     end
   end
 
@@ -439,8 +467,7 @@ function M.open(filter)
     list_col = math.max(0, math.floor((total_w - list_w - 2 - preview_w) / 2))
     preview_col = list_col + list_w + 2
   else
-    list_w = dimension(ui.width or 0.6, total_w, 40)
-    list_w = math.min(list_w, total_w - 2)
+    list_w = math.min(width, total_w - 2)
     list_col = math.floor((total_w - list_w) / 2)
   end
 
