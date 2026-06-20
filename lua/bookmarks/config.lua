@@ -20,7 +20,9 @@ M.defaults = {
 
   -- Floating popup appearance.
   ui = {
-    width = 0.6, -- fraction of total columns (or an integer >= 1 for absolute)
+    -- Overall popup width, covering the list pane plus the preview pane when
+    -- shown. Fraction of total columns, or an integer >= 1 for absolute cols.
+    width = 0.6,
     height = 0.6, -- fraction of total lines  (or an integer >= 1 for absolute)
     border = "rounded",
     title = " Bookmarks ",
